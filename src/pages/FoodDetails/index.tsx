@@ -73,7 +73,12 @@ const FoodDetails: React.FC = () => {
 
   useEffect(() => {
     async function loadFood(): Promise<void> {
-      // Load a specific food with extras based on routeParams id
+      const { data } = await api.get(`foods`, {
+        params: {
+          id_like: routeParams.id,
+        },
+      });
+      setFood(data[0]);
     }
 
     loadFood();
@@ -179,7 +184,7 @@ const FoodDetails: React.FC = () => {
         <TotalContainer>
           <Title>Total do pedido</Title>
           <PriceButtonContainer>
-            <TotalPrice testID="cart-total">{cartTotal}</TotalPrice>
+            {/* <TotalPrice testID="cart-total">{cartTotal}</TotalPrice> */}
             <QuantityContainer>
               <Icon
                 size={15}
