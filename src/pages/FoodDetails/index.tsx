@@ -57,7 +57,19 @@ interface Food {
   price: number;
   image_url: string;
   formattedPrice: string;
+  thumbnail_url: string;
+  category: number;
   extras: Extra[];
+}
+
+interface Favorites {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  category: number;
+  image_url: string;
+  thumbnail_url: string;
 }
 
 const FoodDetails: React.FC = () => {
@@ -73,43 +85,114 @@ const FoodDetails: React.FC = () => {
 
   useEffect(() => {
     async function loadFood(): Promise<void> {
-      const { data } = await api.get(`foods`, {
-        params: {
-          id_like: routeParams.id,
-        },
+      const response = await api.get<Food>(`foods/${routeParams.id}`);
+      setFood({
+        ...response.data,
+        formattedPrice: formatValue(response.data.price),
       });
-      setFood(data[0]);
+
+      setExtras(
+        response.data.extras.map(extra => ({
+          ...extra,
+          quantity: 0,
+        })),
+      );
+
+      const { data: favorites } = await api.get(`favorites`);
+      const favs: Favorites[] = favorites.filter(
+        (fav: Favorites) => fav.id === food.id,
+      );
+      setIsFavorite(!!favs[0]);
     }
 
     loadFood();
-  }, [routeParams]);
+  }, [food.id, routeParams]);
 
   function handleIncrementExtra(id: number): void {
-    // Increment extra quantity
+    setExtras(
+      extras.map(extra => {
+        if (extra.id !== id) return extra;
+
+        return {
+          ...extra,
+          quantity: extra.quantity + 1,
+        };
+      }),
+    );
   }
 
   function handleDecrementExtra(id: number): void {
-    // Decrement extra quantity
+    setExtras(
+      extras.map(extra => {
+        if (extra.id !== id) return extra;
+        if (extra.quantity < 1) return extra;
+        return {
+          ...extra,
+          quantity: extra.quantity - 1,
+        };
+      }),
+    );
   }
 
   function handleIncrementFood(): void {
-    // Increment food quantity
+    setFoodQuantity(foodQuantity + 1);
   }
 
   function handleDecrementFood(): void {
-    // Decrement food quantity
+    if (foodQuantity > 1) {
+      setFoodQuantity(foodQuantity - 1);
+    }
   }
 
-  const toggleFavorite = useCallback(() => {
-    // Toggle if food is favorite or not
+  const toggleFavorite = useCallback(async () => {
+    if (isFavorite) {
+      await api.delete(`favorites/${food.id}`);
+    } else {
+      await api.post(`favorites`, {
+        id: food.id,
+        name: food.name,
+        description: food.description,
+        price: food.price,
+        category: food.category,
+        image_url: food.image_url,
+        thumbnail_url: food.thumbnail_url,
+      });
+    }
+    setIsFavorite(!isFavorite);
   }, [isFavorite, food]);
 
   const cartTotal = useMemo(() => {
-    // Calculate cartTotal
+    const extrasTotalCost = extras
+      .map(extra => extra.value * extra.quantity)
+      .reduce((acc, value) => acc + value, 0);
+
+    const foodCost = food.price * foodQuantity;
+
+    return formatValue(foodCost + extrasTotalCost);
+  }, [extras, food, foodQuantity]);
+
+  const cartTotalWithoutFormat = useMemo(() => {
+    const extrasTotalCost = extras
+      .map(extra => extra.value * extra.quantity)
+      .reduce((acc, value) => acc + value, 0);
+
+    const foodCost = food.price * foodQuantity;
+
+    return foodCost + extrasTotalCost;
   }, [extras, food, foodQuantity]);
 
   async function handleFinishOrder(): Promise<void> {
-    // Finish the order and save on the API
+    const newOrder = {
+      id: 3,
+      product_id: food.id,
+      name: food.name,
+      price: cartTotalWithoutFormat,
+      description: food.description,
+      category: food.category,
+      thumbnail_url: food.thumbnail_url,
+      extras,
+    };
+    await api.post('orders', newOrder);
   }
 
   // Calculate the correct icon name
@@ -184,7 +267,7 @@ const FoodDetails: React.FC = () => {
         <TotalContainer>
           <Title>Total do pedido</Title>
           <PriceButtonContainer>
-            {/* <TotalPrice testID="cart-total">{cartTotal}</TotalPrice> */}
+            <TotalPrice testID="cart-total">{cartTotal}</TotalPrice>
             <QuantityContainer>
               <Icon
                 size={15}
